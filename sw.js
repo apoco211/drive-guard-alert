@@ -1,4 +1,4 @@
-const CACHE_NAME = 'drive-guard-alert-v8.14.90';
+const CACHE_NAME = 'drive-guard-alert-버전 미상';
 const urlsToCache = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', e => {
   self.skipWaiting();
