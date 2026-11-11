@@ -1,30 +1,197 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>drive-guard-alert 🛑</title>
-<meta name="theme-color" content="#ef4444">
-<link rel="manifest" href="./manifest.json?v=8.14.90">
-<link rel="apple-touch-icon" href="./apple-touch-icon.png?v=8.14.90">
-<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png?v=8.14.90">
+<html lang="ko"><head><style>
+@font-face {
+  font-family: "Optimistic";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("/fonts/OptimisticAI_VF_Optimized.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Optimistic Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/OptimisticMono_W_TextRegular.woff2") format("woff2");
+}
+:where(html) {
+  font-family: "Optimistic", system-ui, sans-serif;
+}
+:where(code, pre, kbd, samp) {
+  font-family: "Optimistic Mono", ui-monospace, monospace;
+}
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DriveGuard">
+<title>DriveGuard - 운행중 화면</title>
 <style>
-  body { margin:0; font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#fff; color:#111; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; text-align:center; }
-  .icon { width:120px; height:120px; background:#ef4444; border-radius:28px; display:flex; align-items:center; justify-content:center; font-size:64px; box-shadow:0 8px 24px rgba(0,0,0,0.15); }
-  h1 { margin:24px 0 8px; font-size:28px; font-weight:900; }
-  p { opacity:0.6; font-size:14px; }
-  .badge { margin-top:16px; padding:6px 12px; background:#ef4444; color:#fff; border-radius:999px; font-size:12px; font-weight:700; }
+  *{box-sizing:border-box} body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;background:#111;color:#fff}
+  .wrap{max-width:480px;margin:0 auto;padding:16px;padding-bottom:env(safe-area-inset-bottom);min-height:100dvh;display:flex;flex-direction:column;gap:14px}
+  .top{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#aaa}
+  .speed-card{background:#1c1c1e;border-radius:20px;padding:18px;text-align:center}
+  .speed-big{font-size:64px;font-weight:900;line-height:1} .unit{font-size:18px;color:#aaa}
+  .status{margin-top:8px;display:inline-block;padding:6px 12px;border-radius:999px;font-weight:700;font-size:14px}
+  .status.driving{background:#ff3b30;color:#fff} .status.stopped{background:#34c759;color:#fff}
+  .card{background:#1c1c1e;border-radius:16px;padding:16px}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  input[type=range]{width:100%} .small{font-size:12px;color:#aaa;line-height:1.5}
+  .btn{width:100%;padding:14px;border-radius:14px;border:0;font-size:16px;font-weight:800;cursor:pointer}
+  .btn-yellow{background:#ffe600;color:#111} .btn-dark{background:#2c2c2e;color:#fff} .btn-green{background:#34c759;color:#fff}
+  /* 경고 오버레이 */
+  #warn{position:fixed;inset:0;background:#d7000f;color:#fff;display:none;flex-direction:column;z-index:99;padding:20px;padding-top:env(safe-area-inset-top)}
+  #warn.show{display:flex}
+  #warn h1{font-size:44px;line-height:1.1;margin:10px 0 6px}
+  #warn .warn-speed{font-size:72px;font-weight:900;line-height:1}
+  #warn .warn-sub{font-size:16px;opacity:.95;line-height:1.5}
+  #warn .actions{margin-top:auto;display:flex;flex-direction:column;gap:10px}
+  #warn .close-btn{background:#fff;color:#d7000f}
+  #warn .navi-btn{background:#111;color:#fff}
+  .pill{background:rgba(255,255,255,.2);padding:6px 10px;border-radius:999px;font-size:12px;display:inline-block}
+  .hidden{display:none}
+  .theme-btn{background:#2c2c2e;color:#fff;border:0;padding:7px 12px;border-radius:999px;font-size:13px;font-weight:700;cursor:pointer}
+  body.light{background:#f2f2f7;color:#111}
+  body.light .top{color:#666}
+  body.light .speed-card, body.light .card{background:#fff;color:#111;box-shadow:0 1px 6px rgba(0,0,0,.08)}
+  body.light .small{color:#666}
+  body.light .theme-btn{background:#e5e5ea;color:#111}
+  body.light .btn-dark{background:#e5e5ea;color:#111}
 </style>
 </head>
 <body>
-<div class="icon">🛑</div>
-<h1>drive-guard-alert</h1>
-<p>AI가 생성한 PWA 앱 - v8.14.90</p>
-<div class="badge">#ef4444 🛑</div>
+<div class="wrap">
+  <div class="top"><span>● DriveGuard</span><span id="gpsState">위치 오류</span><button class="theme-btn" id="themeBtn">☀️ 주간</button></div>
+
+  <div class="speed-card">
+    <div>현재 속도</div>
+    <div><span class="speed-big" id="speed">0</span> <span class="unit">km/h</span></div>
+    <div><span class="status stopped" id="statusBadge">정차 중 - 작업 가능</span></div>
+    <div class="small" style="margin-top:10px" id="detail">위치 권한을 확인하세요: 설정 &gt; Safari &gt; 위치 &gt; 앱을 사용하는 동안. Origin does not have permission to use Geolocation service</div>
+  </div>
+
+  <div class="card">
+    <div class="row"><b>속도 기준</b><b id="thresholdLabel">10 km/h</b></div>
+    <input type="range" id="threshold" min="5" max="30" step="1" value="10">
+    <div class="small">이 속도 이상이면 경고가 뜹니다. 추천은 시내 택시 10km/h입니다.</div>
+  </div>
+
+  <div class="card">
+    <div class="row"><b>자동 해제</b><span>10초</span></div>
+    <div class="small">기준 아래로 10초 이상 유지되면 경고가 자동으로 사라집니다.</div>
+    <div class="row" style="margin-top:10px"><b>닫은 후 다시 띄우기</b><span>3분</span></div>
+    <div class="small">닫기 버튼을 눌러도 계속 운전 중이면 3분 뒤에 다시 뜹니다.</div>
+  </div>
+
+  <button class="btn btn-yellow" id="startBtn">측정 중지하기</button>
+  <button class="btn btn-dark" id="naviBtn">카카오내비 열기</button>
+  <div class="small">사용법: 이 화면을 켜둘 필요 없어요. 단축어가 AI 앱을 열 때 속도를 재서, 운전 중이면 이 화면을 자동으로 열어줍니다. 이 화면은 단축어가 열었을 때 경고만 보여주는 용도예요.</div>
+</div>
+
+<!-- 경고 화면 -->
+<div id="warn">
+  <span class="pill">⚠ 운전 중입니다</span>
+  <h1>운전 중입니다<br>작업은 정차 후에</h1>
+  <div><span class="warn-speed" id="warnSpeed">0</span> <span style="font-size:20px">km/h</span></div>
+  <p class="warn-sub">속도가 기준 아래로 10초 이상 떨어지면<br>이 화면은 자동으로 사라집니다.</p>
+  <div class="actions">
+    <button class="btn navi-btn" id="warnNaviBtn">카카오내비로 가기</button>
+    <button class="btn close-btn" id="closeBtn">닫기 (3분 뒤 다시 뜸)</button>
+  </div>
+</div>
+
 <script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').then(r=>console.log('SW ok', r.scope)).catch(e=>console.log('SW fail', e)));
+let watchId=null, threshold=10, belowSec=0, dismissedUntil=0, isWarning=false, lastSpeed=0;
+const $=id=>document.getElementById(id);
+
+// 주야간 토글 - 기본은 야간(어두움)
+const savedTheme = localStorage.getItem('driveguard-theme');
+if(savedTheme==='light'){ document.body.classList.add('light'); document.getElementById('themeBtn').textContent='🌙 야간'; }
+document.getElementById('themeBtn').onclick=()=>{
+  const isLight = document.body.classList.toggle('light');
+  localStorage.setItem('driveguard-theme', isLight?'light':'dark');
+  document.getElementById('themeBtn').textContent = isLight ? '🌙 야간' : '☀️ 주간';
+};
+
+$('threshold').addEventListener('input', e=>{
+  threshold=Number(e.target.value);
+  $('thresholdLabel').textContent=threshold+' km/h';
+});
+
+function openKakaoNavi(){
+  // 카카오내비 앱이 있으면 앱으로, 없으면 웹으로
+  location.href='kakaonavi://navigate?';
+  setTimeout(()=>{ window.open('https://map.kakao.com/','_blank'); }, 800);
 }
+$('naviBtn').onclick=openKakaoNavi;
+$('warnNaviBtn').onclick=openKakaoNavi;
+
+$('closeBtn').onclick=()=>{
+  dismissedUntil=Date.now()+3*60*1000;
+  hideWarning('닫음 - 3분 뒤 운전 중이면 다시 뜹니다');
+};
+
+function showWarning(){
+  if(Date.now()<dismissedUntil) return;
+  if(isWarning) return;
+  isWarning=true;
+  $('warn').classList.add('show');
+}
+function hideWarning(msg){
+  if(!isWarning) return;
+  isWarning=false;
+  $('warn').classList.remove('show');
+  if(msg) $('detail').textContent=msg;
+}
+
+function onPos(pos){
+  const s=pos.coords.speed;
+  const kmh = (s==null||s<0)?0: s*3.6;
+  lastSpeed=kmh;
+  $('speed').textContent=Math.round(kmh);
+  $('warnSpeed').textContent=Math.round(kmh);
+  $('gpsState').textContent='측정 중 • 정확도 '+Math.round(pos.coords.accuracy)+'m';
+
+  if(kmh>=threshold){
+    belowSec=0;
+    $('statusBadge').textContent='운전 중 - 작업 중단';
+    $('statusBadge').className='status driving';
+    $('detail').textContent='기준 '+threshold+'km/h 이상입니다. 경고가 뜹니다.';
+    showWarning();
+  } else {
+    belowSec+=1;
+    // 1초 간격으로 watch가 온다고 가정, 실제로는 위치 업데이트마다 카운트
+    if(belowSec>=10){
+      hideWarning('기준 아래로 10초 유지 - 경고 해제');
+      $('statusBadge').textContent='정차 중 - 작업 가능';
+      $('statusBadge').className='status stopped';
+      $('detail').textContent='기준 아래로 10초 유지 중입니다. 작업해도 됩니다.';
+      belowSec=0;
+    } else {
+      $('detail').textContent='기준 아래 '+belowSec+'초 경과 중... 10초 되면 경고가 사라집니다.';
+    }
+  }
+}
+function onErr(e){
+  $('gpsState').textContent='위치 오류';
+  $('detail').textContent='위치 권한을 확인하세요: 설정 > Safari > 위치 > 앱을 사용하는 동안. '+e.message;
+}
+
+function startMeasure(){
+  if(!('geolocation' in navigator)){ alert('이 브라우저는 위치를 지원하지 않습니다. Safari로 열어주세요.'); return; }
+  if(watchId!=null) return;
+  $('startBtn').textContent='측정 중지하기';
+  $('gpsState').textContent='위치 권한 요청 중...';
+  watchId=navigator.geolocation.watchPosition(onPos, onErr, {enableHighAccuracy:true, maximumAge:1000, timeout:10000});
+}
+$('startBtn').onclick=()=>{
+  if(watchId!=null){ navigator.geolocation.clearWatch(watchId); watchId=null; $('startBtn').textContent='측정 다시 시작하기'; $('gpsState').textContent='중지됨'; return; }
+  startMeasure();
+};
+// PWA가 열리자마자 자동으로 속도 측정 시작 - 버튼을 직접 누를 필요 없음
+// 단축어가 AI 앱을 열 때 이 화면을 열면 바로 측정이 시작됨
+window.addEventListener('load', ()=>{ setTimeout(startMeasure, 300); });
 </script>
-</body>
-</html>
+<script>(function(){var loc=location.href.replace(/#.*$/,"");var ATTR_NAMES=["data-product-id","data-productid","data-product_id","product-id","productid","product_id","data-source-entity-id","source-entity-id","source_entity_id","data-product","data-metadata","data-meta"];var DATASET_KEYS=["productId","productid","product_id","sourceEntityId","sourceentityid","source_entity_id","product","metadata","meta"];function readProductId(value){if(typeof value!=="string"||value.length===0)return null;if(/^[0-9]{6,}$/.test(value))return value;var match=value.match(/(?:product(?:_|-)?id|source(?:_|-)?entity(?:_|-)?id)["'=:\s]+([0-9]{6,})/i);return match?match[1]:null}function extractProductId(start){for(var node=start;node&&node!==document.body;node=node.parentElement){for(var i=0;i<ATTR_NAMES.length;i++){var attrValue=node.getAttribute&&node.getAttribute(ATTR_NAMES[i]);var attrProductId=readProductId(attrValue);if(attrProductId)return attrProductId}var dataset=node.dataset||null;if(dataset){for(var j=0;j<DATASET_KEYS.length;j++){var dataValue=dataset[DATASET_KEYS[j]];var dataProductId=readProductId(dataValue);if(dataProductId)return dataProductId}}}return null}function isInlineMediaSlotElement(node){return !!(node&&node.getAttribute&&node.getAttribute("data-clippy-inline-media-slot")!==null)}function findInlineMediaSlot(start){for(var node=start;node&&node!==document.body;node=node.parentElement){if(isInlineMediaSlotElement(node))return node}return null}function readInlineMediaUrl(node){if(!node)return null;return node.getAttribute&&((node.getAttribute("data-clippy-inline-media-url")||node.getAttribute("data-url")||node.getAttribute("data_url")))||node.href||null}function stripHash(url){return String(url).replace(/#.*$/,"")}function urlsMatch(a,b){if(!a||!b)return false;try{return stripHash(new URL(a,loc).href)===stripHash(new URL(b,loc).href)}catch(_){return stripHash(a)===stripHash(b)}}function isFirstPartyReelUrl(value){try{var url=new URL(value,loc);if(url.protocol!=="https:")return false;var host=url.hostname.toLowerCase();var supported=host==="instagram.com"||host.endsWith(".instagram.com")||host==="facebook.com"||host.endsWith(".facebook.com");return supported&&/\/reels?\//i.test(url.pathname)}catch(_){return false}}function isInlineMediaUrlClick(node,href){var slot=findInlineMediaSlot(node);if(!slot)return false;var slotUrl=readInlineMediaUrl(slot);if(slotUrl)return urlsMatch(href,slotUrl);return isFirstPartyReelUrl(href)}function findDataHref(start){for(var node=start;node&&node!==document.body;node=node.parentElement){if(node.getAttribute){var href=node.getAttribute("data-href")||node.getAttribute("data-url");if(href)return{href:href,node:node}}}return null}var nativeOpen=window.open;window.open=function(url){if(parent!==window&&typeof url==="string"&&/^https?:\/\//.test(url)){parent.postMessage({type:"ecto:usercontent-link-click",href:url},"*");return null}return nativeOpen?nativeOpen.apply(window,arguments):null};document.addEventListener("click",function(e){var target=e.target instanceof Element?e.target:null;if(!target)return;if(parent===window)return;var a=target.closest?target.closest("a[href]"):null;if(a&&a.href&&/^https?:\/\//.test(a.href)&&a.href.replace(/#.*$/,"")!==loc){if(isInlineMediaUrlClick(a,a.href))return;var productId=extractProductId(target)||extractProductId(a);if(productId){e.preventDefault();parent.postMessage({type:"ecto-artifact-link-click",productId:productId},"*");return}e.preventDefault();parent.postMessage({type:"ecto:usercontent-link-click",href:a.href},"*");return}var dataHref=findDataHref(target);if(dataHref&&/^https?:\/\//.test(dataHref.href)&&dataHref.href.replace(/#.*$/,"")!==loc){if(isInlineMediaUrlClick(dataHref.node,dataHref.href))return;e.preventDefault();parent.postMessage({type:"ecto:usercontent-link-click",href:dataHref.href},"*")}},true)})();</script><script>(function(){var FOCUS_TYPE="ecto:artifact-focus-request";var CLOSE_TYPE="ecto:artifact-close-request";function focusArtifactDocument(){var body=document.body;if(!body)return;try{window.focus();}catch(e){}if(!body.hasAttribute("tabindex"))body.setAttribute("tabindex","-1");try{body.focus({preventScroll:true});}catch(e){try{body.focus();}catch(e2){}}}window.addEventListener("message",function(event){if(event.source!==window.parent)return;var data=event.data;if(!data||typeof data!=="object"||data.type!==FOCUS_TYPE)return;if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",focusArtifactDocument,{once:true});return;}focusArtifactDocument();});window.addEventListener("keydown",function(event){if(event.key!=="Escape")return;window.setTimeout(function(){if(event.defaultPrevented)return;window.parent.postMessage({type:CLOSE_TYPE},"*");},0);});})();</script>
+
+</body></html>
